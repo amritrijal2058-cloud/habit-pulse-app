@@ -15,9 +15,9 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
-      - name: Set up Java JDK 21 (Required for Android Gradle)
+      - name: Set up Java JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
@@ -26,14 +26,20 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Wrap HTML in Capacitor & Build APK
+      - name: Build Android Project with Capacitor
         run: |
-          mkdir www
-          cp index.html www/
-          npm init -y
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init "HabitPulse" "com.habitpulse.app" --web-dir www
+          mkdir -p www
+          if [ -f "index.html" ]; then
+            cp index.html www/index.html
+          else
+            echo "ERROR: index.html is missing from the root folder!"
+            exit 1
+          fi
+          echo '{"name": "habit-pulse-wrapper", "version": "1.0.0"}' > package.json
+          npm install @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7
+          npx cap init "Habit Pulse" "com.amrit.habitpulse" --web-dir www
           npx cap add android
+          npx cap sync android
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
