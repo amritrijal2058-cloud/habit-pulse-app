@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Habit Pulse — Daily Goal & Streak Tracker</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        zinc: {
+                            850: '#1f1f23',
+                            925: '#121215',
+                            950: '#09090b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #09090b;
+            color: #fafafa;
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: none;
+        }
+        /* Custom subtle scrollbars */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #09090b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #27272a;
+            border-radius: 9999px;
+        }
+        /* Micro-interaction spring animation for checkboxes */
+        @keyframes popScale {
+            0% { transform: scale(0.85); }
+            50% { transform: scale(1.12); }
+            100% { transform: scale(1); }
+        }
+        .animate-pop {
+            animation: popScale 0.24s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        /* Smooth height transition for bar chart */
+        .bar-transition {
+            transition: height 0.4s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s ease;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between antialiased selection:bg-emerald-500 selection:text-zinc-950 pb-24">
+
+    <!-- Top Sticky App Bar -->
+    <header class="sticky top-0 z-30 backdrop-blur-xl bg-zinc-950/85 border-b border-zinc-800/80 px-4 py-3.5">
+        <div class="max-w-xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                    <i data-lucide="flame" class="w-5 h-5 text-zinc-950 fill-zinc-950"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-base font-extrabold tracking-tight text-white">HABIT PULSE</h1>
+                        <span id="weekBadge" class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700/60">
+                            This Week
+                        </span>
+                    </div>
+                    <p id="currentDateDisplay" class="text-xs text-zinc-400 font-medium">Loading date...</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button onclick="openResetModal()" title="Reset Defaults" class="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 transition active:scale-95">
+                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                </button>
+                <button onclick="openAddModal()" class="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs px-3.5 py-2.5 rounded-xl shadow-lg shadow-emerald-500/20 transition active:scale-95">
+                    <i data-lucide="plus" class="w-4 h-4 stroke-[2.5]"></i>
+                    <span>New Goal</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="max-w-xl w-full mx-auto px-4 pt-4 space-y-5 flex-1">
+
+        <!-- KPI Summary Cards (3 Columns on Mobile) -->
+        <section class="grid grid-cols-3 gap-2.5">
+            <!-- Today's Progress -->
+            <div class="bg-zinc-900/90 border border-zinc-800/90 rounded-2xl p-3.5 flex flex-col justify-between relative overflow-hidden">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Today</span>
+                    <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+                </div>
+                <div class="mt-2">
+                    <div class="flex items-baseline gap-1">
+                        <span id="todayScoreText" class="text-2xl font-extrabold text-white">0/0</span>
+                    </div>
+                    <div class="w-full bg-zinc-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                        <div id="todayProgressBar" class="bg-emerald-400 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Weekly Completion Rate -->
+            <div class="bg-zinc-900/90 border border-zinc-800/90 rounded-2xl p-3.5 flex flex-col justify-between">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Weekly</span>
+                    <i data-lucide="bar-chart-3" class="w-4 h-4 text-sky-400"></i>
+                </div>
+                <div class="mt-2">
+                    <span id="weeklyPercentText" class="text-2xl font-extrabold text-white">0%</span>
+                    <p id="weeklySubText" class="text-[11px] text-zinc-400 mt-1 truncate">0 of 0 check-ins</p>
+                </div>
+            </div>
+
+            <!-- Active Streak Power -->
+            <div class="bg-zinc-900/90 border border-zinc-800/90 rounded-2xl p-3.5 flex flex-col justify-between">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Top Streak</span>
+                    <i data-lucide="zap" class="w-4 h-4 text-amber-400 fill-amber-400"></i>
+                </div>
+                <div class="mt-2">
+                    <div class="flex items-baseline gap-1">
+                        <span id="bestStreakText" class="text-2xl font-extrabold text-amber-400">0</span>
+                        <span class="text-xs font-semibold text-zinc-400">days</span>
+                    </div>
+                    <p id="perfectDaysText" class="text-[11px] text-zinc-400 mt-1 truncate">0 perfect days</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Weekly Streak & Completion Chart Card -->
+        <section class="bg-zinc-900/90 border border-zinc-800/90 rounded-2xl p-4 shadow-xl">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-sm font-bold text-white flex items-center gap-1.5">
+                        <span>Weekly Momentum Chart</span>
+                    </h2>
+                    <p class="text-xs text-zinc-400">Tap any day column to focus or inspect</p>
+                </div>
+                <div class="flex items-center gap-2 text-[11px] font-semibold">
+                    <span class="flex items-center gap-1 text-emerald-400">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span> 100%
+                    </span>
+                    <span class="flex items-center gap-1 text-sky-400">
+                        <span class="w-2 h-2 rounded-full bg-sky-400 inline-block"></span> Active
+                    </span>
+                </div>
+            </div>
+
+            <!-- 7-Day Vertical Bar Chart (Mon - Sun) -->
+            <div id="weeklyChartContainer" class="grid grid-cols-7 gap-2 pt-2 pb-1 items-end h-36">
+                <!-- Populated dynamically via JS -->
+            </div>
+        </section>
+
+        <!-- Filter / Quick Day Selector Strip -->
+        <section class="flex items-center justify-between pt-1">
+            <div class="flex items-center gap-2">
+                <h2 class="text-sm font-bold uppercase tracking-wider text-zinc-300">Daily Habits</h2>
+                <span id="habitCountBadge" class="text-xs font-bold px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300">5</span>
+            </div>
+            <button onclick="markAllToday()" class="text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 py-1 px-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 transition active:scale-95">
+                <i data-lucide="check-check" class="w-3.5 h-3.5"></i>
+                <span>Complete Today</span>
+            </button>
+        </section>
+
+        <!-- Habit Cards List -->
+        <section id="habitsListContainer" class="space-y-3">
+            <!-- Dynamically rendered habit cards -->
+        </section>
+
+        <!-- Empty State (Hidden when habits exist) -->
+        <div id="emptyState" class="hidden bg-zinc-900/50 border border-dashed border-zinc-800 rounded-2xl p-8 text-center my-6">
+            <div class="w-12 h-12 rounded-2xl bg-zinc-800/80 flex items-center justify-center mx-auto mb-3 text-zinc-400">
+                <i data-lucide="sparkles" class="w-6 h-6"></i>
+            </div>
+            <h3 class="text-base font-bold text-white">No habits tracked yet</h3>
+            <p class="text-xs text-zinc-400 max-w-xs mx-auto mt-1 mb-4">Add your first daily habit or restore the default high-performance routine.</p>
+            <div class="flex justify-center gap-2">
+                <button onclick="openAddModal()" class="bg-emerald-500 text-zinc-950 font-bold text-xs px-4 py-2.5 rounded-xl">
+                    + Add Custom Habit
+                </button>
+                <button onclick="restoreDefaults()" class="bg-zinc-800 text-zinc-200 font-semibold text-xs px-4 py-2.5 rounded-xl">
+                    Restore Defaults
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Floating Bottom Quick-Add Bar for Thumb Reachability on Mobile -->
+    <div class="fixed bottom-0 inset-x-0 z-20 pointer-events-none">
+        <div class="max-w-xl mx-auto px-4 pb-4 pt-2 bg-gradient-to-t from-zinc-950 via-zinc-950/90 to-transparent pointer-events-auto">
+            <form id="quickAddForm" onsubmit="handleQuickAdd(event)" class="flex items-center gap-2 bg-zinc-900/95 border border-zinc-700/80 rounded-2xl p-1.5 shadow-2xl">
+                <button type="button" onclick="cycleQuickColor()" id="quickColorBtn" class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 transition active:scale-90" title="Tap to switch color">
+                    <span id="quickEmojiDisplay" class="text-base">⚡</span>
+                </button>
+                <input 
+                    type="text" 
+                    id="quickHabitInput" 
+                    placeholder="Quick-add a habit (e.g. Read 20 Pages)..." 
+                    maxlength="42"
+                    class="w-full bg-transparent text-sm text-white placeholder-zinc-500 focus:outline-none px-1"
+                />
+                <button type="submit" class="bg-zinc-100 hover:bg-white text-zinc-950 font-bold text-xs px-3.5 py-2.5 rounded-xl shrink-0 transition active:scale-95">
+                    Add
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Custom Habit Modal -->
+    <div id="addModal" class="fixed inset-0 z-50 hidden items-end sm:items-center justify-center bg-black/75 backdrop-blur-sm p-0 sm:p-4">
+        <div class="bg-zinc-900 border-t sm:border border-zinc-800 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl animate-in slide-in-from-bottom duration-200">
+            <div class="flex items-center justify-between pb-3 border-b border-zinc-800">
+                <h3 class="text-base font-bold text-white">Create Daily Habit</h3>
+                <button onclick="closeAddModal()" class="p-1.5 rounded-xl bg-zinc-800 text-zinc-400 hover:text-white">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleModalAdd(event)" class="space-y-4 mt-4">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1.5">Habit Title</label>
+                    <input 
+                        type="text" 
+                        id="modalHabitName" 
+                        required
+                        maxlength="45"
+                        placeholder="e.g., Cold Plunge, Mobility Flow" 
+                        class="w-full bg-zinc-950 border border-zinc-800 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none"
+                    />
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1.5">Category / Tag</label>
+                        <select id="modalHabitCategory" class="w-full bg-zinc-950 border border-zinc-800 focus:border-emerald-500 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none">
+                            <option value="Fitness">💪 Fitness</option>
+                            <option value="Nutrition">🥗 Nutrition</option>
+                            <option value="Learning">💻 Learning</option>
+                            <option value="Wellness">✨ Wellness</option>
+                            <option value="Health">💧 Health</option>
+                            <option value="Mindset">🧠 Mindset</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1.5">Daily Target</label>
+                        <input 
+                            type="text" 
+                            id="modalHabitMeta" 
+                            maxlength="24"
+                            placeholder="e.g., 45 mins, 3L" 
+                            class="w-full bg-zinc-950 border border-zinc-800 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none"
+                        />
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">Accent Theme</label>
+                    <div id="colorPickerGrid" class="grid grid-cols-5 gap-2">
+                        <!-- Rendered via JS -->
+                    </div>
+                </div>
+
+                <div class="pt-2 flex gap-2.5">
+                    <button type="button" onclick="closeAddModal()" class="w-1/3 py-2.5 rounded-xl bg-zinc-800 text-zinc-300 font-semibold text-xs">
+                        Cancel
+                    </button>
+                    <button type="submit" class="w-2/3 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs shadow-lg shadow-emerald-500/20">
+                        Save Habit
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal (No native alert/confirm) -->
+    <div id="confirmModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+        <div class="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-3xl p-5 shadow-2xl">
+            <div class="w-10 h-10 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center mb-3">
+                <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+            </div>
+            <h3 id="confirmModalTitle" class="text-base font-bold text-white">Reset Habit Data?</h3>
+            <p id="confirmModalDesc" class="text-xs text-zinc-400 mt-1 leading-relaxed">
+                This will restore the 5 default habits and reset your current week's check-ins.
+            </p>
+            <div class="flex gap-2.5 mt-5">
+                <button onclick="closeConfirmModal()" class="flex-1 py-2.5 rounded-xl bg-zinc-800 text-zinc-300 font-semibold text-xs">
+                    Cancel
+                </button>
+                <button id="confirmModalActionBtn" class="flex-1 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-400 text-zinc-950 font-bold text-xs">
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-all duration-300 transform -translate-y-2">
+        <div class="bg-zinc-800/95 backdrop-blur border border-zinc-700 text-white text-xs font-semibold px-4 py-2 rounded-full shadow-xl flex items-center gap-2">
+            <span id="toastDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span id="toastMessage">Saved</span>
+        </div>
+    </div>
+
+    <script>
+        /**************************************************************
+         * STATE, CONSTANTS & THEME PALETTE
+         **************************************************************/
+        const STORAGE_KEY = 'habit_pulse_dashboard_v1';
+        const DAYS_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+        const THEMES = {
+            emerald: {
+                name: 'Emerald',
+                emoji: '💪',
+                bgActive: 'bg-emerald-500',
+                borderActive: 'border-emerald-400',
+                textActive: 'text-emerald-400',
+                softBg: 'bg-emerald-500/15',
+                softBorder: 'border-emerald-500/30',
+                barColor: 'bg-emerald-400',
+                ring: 'ring-emerald-500/40'
+            },
+            amber: {
+                name: 'Amber',
+                emoji: '⚡',
+                bgActive: 'bg-amber-400',
+                borderActive: 'border-amber-300',
+                textActive: 'text-amber-400',
+                softBg: 'bg-amber-500/15',
+                softBorder: 'border-amber-500/30',
+                barColor: 'bg-amber-400',
+                ring: 'ring-amber-500/40'
+            },
+            violet: {
+                name: 'Violet',
+                emoji: '💻',
+                bgActive: 'bg-violet-500',
+                borderActive: 'border-violet-400',
+                textActive: 'text-violet-400',
+                softBg: 'bg-violet-500/15',
+                softBorder: 'border-violet-500/30',
+                barColor: 'bg-violet-400',
+                ring: 'ring-violet-500/40'
+            },
+            rose: {
+                name: 'Rose',
+                emoji: '✨',
+                bgActive: 'bg-rose-500',
+                borderActive: 'border-rose-400',
+                textActive: 'text-rose-400',
+                softBg: 'bg-rose-500/15',
+                softBorder: 'border-rose-500/30',
+                barColor: 'bg-rose-400',
+                ring: 'ring-rose-500/40'
+            },
+            cyan: {
+                name: 'Cyan',
+                emoji: '💧',
+                bgActive: 'bg-cyan-400',
+                borderActive: 'border-cyan-300',
+                textActive: 'text-cyan-400',
+                softBg: 'bg-cyan-500/15',
+                softBorder: 'border-cyan-500/30',
+                barColor: 'bg-cyan-400',
+                ring: 'ring-cyan-500/40'
+            }
+        };
+
+        const THEME_KEYS = Object.keys(THEMES);
+        let selectedModalTheme = 'emerald';
+        let quickThemeIndex = 0;
+
+        // Calculate current day of week index (0 = Mon ... 6 = Sun)
+        function getCurrentDayIndex() {
+            const jsDay = new Date().getDay(); // 0 is Sunday
+            return jsDay === 0 ? 6 : jsDay - 1;
+        }
+
+        const todayIndex = getCurrentDayIndex();
+        let focusedDayIndex = todayIndex;
+
+        // Generate realistic pre-populated defaults up to todayIndex
+        function getDefaultHabits() {
+            const makeProgress = (pattern) => {
+                return DAYS_SHORT.map((_, idx) => idx <= todayIndex ? Boolean(pattern[idx]) : false);
+            };
+
+            return [
+                {
+                    id: 'hab-1',
+                    name: 'Upper Body Workout',
+                    category: 'Fitness',
+                    meta: '45m hypertrophy',
+                    theme: 'emerald',
+                    emoji: '💪',
+                    days: makeProgress([1, 1, 0, 1, 1, 0, 1])
+                },
+                {
+                    id: 'hab-2',
+                    name: 'Creatine & Protein',
+                    category: 'Nutrition',
+                    meta: '5g + 30g whey',
+                    theme: 'amber',
+                    emoji: '⚡',
+                    days: makeProgress([1, 1, 1, 1, 1, 1, 1])
+                },
+                {
+                    id: 'hab-3',
+                    name: 'Python/SQL Study',
+                    category: 'Learning',
+                    meta: '1 hr deep work',
+                    theme: 'violet',
+                    emoji: '💻',
+                    days: makeProgress([1, 0, 1, 1, 1, 0, 0])
+                },
+                {
+                    id: 'hab-4',
+                    name: 'Skincare Routine',
+                    category: 'Wellness',
+                    meta: 'AM + PM SPF/Retinol',
+                    theme: 'rose',
+                    emoji: '✨',
+                    days: makeProgress([1, 1, 1, 0, 1, 1, 1])
+                },
+                {
+                    id: 'hab-5',
+                    name: 'Hydration (3L Water)',
+                    category: 'Health',
+                    meta: '3,000 ml',
+                    theme: 'cyan',
+                    emoji: '💧',
+                    days: makeProgress([1, 1, 1, 1, 0, 1, 1])
+                }
+            ];
+        }
+
+        let habits = [];
+
+        /**************************************************************
+         * LOCAL STORAGE PERSISTENCE
+         **************************************************************/
+        function loadHabits() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed)) {
+                        habits = parsed;
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to read habits from localStorage:', err);
+            }
+            habits = getDefaultHabits();
+            saveHabits();
+        }
+
+        function saveHabits() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(habits));
+            } catch (err) {
+                console.error('Failed to save habits to localStorage:', err);
+            }
+        }
+
+        /**************************************************************
+         * STREAK & ANALYTICS CALCULATIONS
+         **************************************************************/
+        // Compute longest consecutive streak in the current week or active run up to today
+        function calculateStreak(daysArray) {
+            let currentRun = 0;
+            let maxRun = 0;
+            for (let i = 0; i < 7; i++) {
+                if (daysArray[i]) {
+                    currentRun++;
+                    if (currentRun > maxRun) maxRun = currentRun;
+                } else if (i <= todayIndex) {
+                    currentRun = 0;
+                }
+            }
+            return maxRun;
+        }
+
+        function getWeekDates() {
+            const now = new Date();
+            const currentDay = now.getDay();
+            const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+            const monday = new Date(now);
+            monday.setDate(now.getDate() + diffToMonday);
+
+            return DAYS_SHORT.map((label, idx) => {
+                const d = new Date(monday);
+                d.setDate(monday.getDate() + idx);
+                return {
+                    label,
+                    dateNum: d.getDate(),
+                    isToday: idx === todayIndex
+                };
+            });
+        }
+
+        /**************************************************************
+         * UI RENDERING
+         **************************************************************/
+        function renderHeaderDate() {
+            const now = new Date();
+            const options = { weekday: 'short', month: 'short', day: 'numeric' };
+            document.getElementById('currentDateDisplay').textContent =
+                now.toLocaleDateString(undefined, options) + ' • Week View';
+        }
+
+        function renderStatsAndChart() {
+            const totalHabits = habits.length;
+            const weekDates = getWeekDates();
+
+            // Today's completion
+            const completedToday = habits.filter(h => h.days[todayIndex]).length;
+            const todayPct = totalHabits > 0 ? Math.round((completedToday / totalHabits) * 100) : 0;
+
+            document.getElementById('todayScoreText').textContent = `${completedToday}/${totalHabits}`;
+            document.getElementById('todayProgressBar').style.width = `${todayPct}%`;
+
+            // Weekly completion
+            const totalPossibleWeek = totalHabits * 7;
+            let totalChecksWeek = 0;
+            let bestStreak = 0;
+            let perfectDaysCount = 0;
+
+            habits.forEach(h => {
+                const s = calculateStreak(h.days);
+                if (s > bestStreak) bestStreak = s;
+                h.days.forEach(done => {
+                    if (done) totalChecksWeek++;
+                });
+            });
+
+            const weeklyPct = totalPossibleWeek > 0 ? Math.round((totalChecksWeek / totalPossibleWeek) * 100) : 0;
+            document.getElementById('weeklyPercentText').textContent = `${weeklyPct}%`;
+            document.getElementById('weeklySubText').textContent = `${totalChecksWeek} of ${totalPossibleWeek} check-ins`;
+
+            // Render 7-Day Bar Chart
+            const chartContainer = document.getElementById('weeklyChartContainer');
+            chartContainer.innerHTML = '';
+
+            weekDates.forEach((dayObj, dIdx) => {
+                const completedOnDay = habits.filter(h => h.days[dIdx]).length;
+                const pct = totalHabits > 0 ? Math.round((completedOnDay / totalHabits) * 100) : 0;
+                if (totalHabits > 0 && completedOnDay === totalHabits) {
+                    perfectDaysCount++;
+                }
+
+                const isFocused = dIdx === focusedDayIndex;
+                const isPerfect = totalHabits > 0 && completedOnDay === totalHabits;
+
+                // Determine bar styling
+                let barColorClass = 'bg-zinc-700';
+                if (isPerfect) {
+                    barColorClass = 'bg-gradient-to-t from-emerald-500 to-teal-300 shadow-lg shadow-emerald-500/20';
+                } else if (completedOnDay > 0) {
+                    barColorClass = 'bg-gradient-to-t from-sky-500 to-cyan-300';
+                }
+
+                const barHeight = totalHabits === 0 ? 8 : Math.max(10, pct);
+
+                const col = document.createElement('button');
+                col.type = 'button';
+                col.onclick = () => {
+                    focusedDayIndex = dIdx;
+                    renderStatsAndChart();
+                };
+                col.className = `group flex flex-col items-center justify-end h-full rounded-xl p-1 transition select-none ${
+                    isFocused ? 'bg-zinc-800/90 ring-1 ring-zinc-700' : 'hover:bg-zinc-800/40'
+                }`;
+
+                col.innerHTML = `
+                    <span class="text-[10px] font-bold ${
+                        isPerfect ? 'text-emerald-400' : completedOnDay > 0 ? 'text-zinc-300' : 'text-zinc-500'
+                    } mb-1">
+                        ${completedOnDay}/${totalHabits}
+                    </span>
+                    <div class="w-full max-w-[28px] h-20 bg-zinc-950 rounded-lg p-0.5 flex items-end overflow-hidden border border-zinc-800/80">
+                        <div class="w-full rounded-md bar-transition ${barColorClass}" style="height: ${barHeight}%"></div>
+                    </div>
+                    <div class="mt-1.5 flex flex-col items-center">
+                        <span class="text-[11px] font-bold ${
+                            dayObj.isToday ? 'text-emerald-400' : isFocused ? 'text-white' : 'text-zinc-400'
+                        }">${dayObj.label}</span>
+                        <span class="text-[9px] font-semibold ${
+                            dayObj.isToday ? 'bg-emerald-500/20 text-emerald-300 px-1.5 rounded-full' : 'text-zinc-500'
+                        }">${dayObj.dateNum}</span>
+                    </div>
+                `;
+                chartContainer.appendChild(col);
+            });
+
+            document.getElementById('bestStreakText').textContent = bestStreak;
+            document.getElementById('perfectDaysText').textContent = `${perfectDaysCount} perfect ${perfectDaysCount === 1 ? 'day' : 'days'}`;
+            document.getElementById('habitCountBadge').textContent = totalHabits;
+        }
+
+        function renderHabitsList() {
+            const container = document.getElementById('habitsListContainer');
+            const emptyState = document.getElementById('emptyState');
+            const weekDates = getWeekDates();
+
+            if (habits.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            container.innerHTML = '';
+
+            habits.forEach((habit) => {
+                const theme = THEMES[habit.theme] || THEMES.emerald;
+                const weeklyCount = habit.days.filter(Boolean).length;
+                const streak = calculateStreak(habit.days);
+                const weeklyRate = Math.round((weeklyCount / 7) * 100);
+
+                const card = document.createElement('div');
+                card.className = 'bg-zinc-900/95 border border-zinc-800/90 rounded-2xl p-4 shadow-lg transition hover:border-zinc-700/80';
+
+                // Build 7-day interactive buttons (Mon - Sun)
+                let dayButtonsHTML = '';
+                weekDates.forEach((dObj, dIdx) => {
+                    const isChecked = Boolean(habit.days[dIdx]);
+                    const isToday = dObj.isToday;
+
+                    const btnClasses = isChecked
+                        ? `${theme.bgActive} text-zinc-950 font-extrabold shadow-md`
+                        : isToday
+                        ? 'bg-zinc-800/90 text-zinc-200 border border-zinc-600/80'
+                        : 'bg-zinc-950/90 text-zinc-500 border border-zinc-800/90 hover:border-zinc-700';
+
+                    dayButtonsHTML += `
+                        <button 
+                            type="button"
+                            onclick="toggleHabitDay('${habit.id}', ${dIdx}, this)"
+                            aria-label="Toggle ${habit.name} for ${dObj.label}"
+                            class="flex flex-col items-center justify-center py-2 rounded-xl transition active:scale-90 select-none ${btnClasses}"
+                        >
+                            <span class="text-[10px] uppercase tracking-tighter ${isChecked ? 'text-zinc-950/80 font-bold' : 'text-zinc-400'}">
+                                ${dObj.label}
+                            </span>
+                            <div class="mt-1 w-5 h-5 rounded-full flex items-center justify-center">
+                                ${
+                                    isChecked
+                                        ? `<svg class="w-4 h-4 stroke-[3] text-zinc-950" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`
+                                        : `<span class="text-[11px] font-semibold ${isToday ? 'text-white' : 'text-zinc-500'}">${dObj.dateNum}</span>`
+                                }
+                            </div>
+                        </button>
+                    `;
+                });
+
+                card.innerHTML = `
+                    <div class="flex items-start justify-between gap-2 mb-3">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div class="w-10 h-10 rounded-xl ${theme.softBg} border ${theme.softBorder} flex items-center justify-center text-lg shrink-0">
+                                ${habit.emoji || theme.emoji}
+                            </div>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-sm font-bold text-white truncate">${escapeHTML(habit.name)}</h3>
+                                </div>
+                                <div class="flex items-center gap-2 mt-0.5 text-[11px] text-zinc-400">
+                                    <span class="font-medium text-zinc-300">${escapeHTML(habit.category || 'Daily')}</span>
+                                    ${habit.meta ? `<span>•</span><span class="truncate">${escapeHTML(habit.meta)}</span>` : ''}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <!-- Streak Pill -->
+                            <div class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-zinc-950 border border-zinc-800 text-xs font-bold ${streak > 0 ? theme.textActive : 'text-zinc-500'}" title="Best streak this week">
+                                <i data-lucide="flame" class="w-3.5 h-3.5 ${streak > 0 ? 'fill-current' : ''}"></i>
+                                <span>${streak}d</span>
+                            </div>
+                            <!-- Delete Button -->
+                            <button 
+                                type="button" 
+                                onclick="requestDeleteHabit('${habit.id}')" 
+                                class="p-1.5 rounded-xl text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition"
+                                title="Delete habit"
+                            >
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 7-Day Interactive Grid -->
+                    <div class="grid grid-cols-7 gap-1.5">
+                        ${dayButtonsHTML}
+                    </div>
+
+                    <!-- Individual Habit Mini Progress Bar -->
+                    <div class="mt-3 flex items-center justify-between gap-3">
+                        <div class="w-full bg-zinc-950 h-1.5 rounded-full overflow-hidden border border-zinc-800/60">
+                            <div class="${theme.barColor} h-full rounded-full transition-all duration-300" style="width: ${weeklyRate}%"></div>
+                        </div>
+                        <span class="text-[11px] font-bold text-zinc-400 shrink-0">${weeklyCount}/7 days</span>
+                    </div>
+                `;
+
+                container.appendChild(card);
+            });
+
+            lucide.createIcons();
+        }
+
+        function renderAll() {
+            renderStatsAndChart();
+            renderHabitsList();
+        }
+
+        /**************************************************************
+         * USER INTERACTIONS & ACTIONS
+         **************************************************************/
+        function toggleHabitDay(habitId, dayIdx, btnElement) {
+            const habit = habits.find(h => h.id === habitId);
+            if (!habit) return;
+
+            habit.days[dayIdx] = !habit.days[dayIdx];
+            focusedDayIndex = dayIdx;
+            saveHabits();
+
+            // Re-render and animate
+            renderAll();
+            if (habit.days[dayIdx]) {
+                showToast(`${habit.emoji} ${habit.name} logged!`);
+            }
+        }
+
+        function markAllToday() {
+            if (habits.length === 0) return;
+            const allDone = habits.every(h => h.days[todayIndex]);
+            habits.forEach(h => {
+                h.days[todayIndex] = !allDone;
+            });
+            focusedDayIndex = todayIndex;
+            saveHabits();
+            renderAll();
+            showToast(allDone ? 'Cleared today\'s check-ins' : 'All goals completed for today! 🔥');
+        }
+
+        function cycleQuickColor() {
+            quickThemeIndex = (quickThemeIndex + 1) % THEME_KEYS.length;
+            const themeKey = THEME_KEYS[quickThemeIndex];
+            const theme = THEMES[themeKey];
+            document.getElementById('quickEmojiDisplay').textContent = theme.emoji;
+        }
+
+        function handleQuickAdd(e) {
+            e.preventDefault();
+            const input = document.getElementById('quickHabitInput');
+            const name = input.value.trim();
+            if (!name) return;
+
+            const themeKey = THEME_KEYS[quickThemeIndex];
+            const theme = THEMES[themeKey];
+
+            const newHabit = {
+                id: 'hab-' + Date.now(),
+                name,
+                category: 'Custom',
+                meta: 'Daily goal',
+                theme: themeKey,
+                emoji: theme.emoji,
+                days: [false, false, false, false, false, false, false]
+            };
+
+            habits.unshift(newHabit);
+            saveHabits();
+            renderAll();
+            input.value = '';
+            showToast(`Added "${name}"`);
+        }
+
+        /**************************************************************
+         * MODAL MANAGEMENT (ADD & CONFIRMATION)
+         **************************************************************/
+        function renderColorPicker() {
+            const grid = document.getElementById('colorPickerGrid');
+            grid.innerHTML = '';
+            THEME_KEYS.forEach(key => {
+                const t = THEMES[key];
+                const isSelected = key === selectedModalTheme;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.onclick = () => {
+                    selectedModalTheme = key;
+                    renderColorPicker();
+                };
+                btn.className = `flex flex-col items-center justify-center py-2 rounded-xl border text-xs font-semibold transition ${
+                    isSelected
+                        ? `${t.softBg} ${t.borderActive} text-white ring-2 ${t.ring}`
+                        : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                }`;
+                btn.innerHTML = `
+                    <span class="text-base">${t.emoji}</span>
+                    <span class="text-[10px] mt-0.5">${t.name}</span>
+                `;
+                grid.appendChild(btn);
+            });
+        }
+
+        function openAddModal() {
+            selectedModalTheme = 'emerald';
+            renderColorPicker();
+            document.getElementById('modalHabitName').value = '';
+            document.getElementById('modalHabitMeta').value = '';
+            const modal = document.getElementById('addModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => document.getElementById('modalHabitName').focus(), 100);
+        }
+
+        function closeAddModal() {
+            const modal = document.getElementById('addModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function handleModalAdd(e) {
+            e.preventDefault();
+            const name = document.getElementById('modalHabitName').value.trim();
+            const category = document.getElementById('modalHabitCategory').value;
+            const meta = document.getElementById('modalHabitMeta').value.trim() || 'Daily target';
+            if (!name) return;
+
+            const theme = THEMES[selectedModalTheme] || THEMES.emerald;
+            const newHabit = {
+                id: 'hab-' + Date.now(),
+                name,
+                category,
+                meta,
+                theme: selectedModalTheme,
+                emoji: theme.emoji,
+                days: [false, false, false, false, false, false, false]
+            };
+
+            habits.unshift(newHabit);
+            saveHabits();
+            renderAll();
+            closeAddModal();
+            showToast(`Created "${name}"`);
+        }
+
+        function requestDeleteHabit(habitId) {
+            const habit = habits.find(h => h.id === habitId);
+            if (!habit) return;
+
+            const modal = document.getElementById('confirmModal');
+            document.getElementById('confirmModalTitle').textContent = `Delete "${habit.name}"?`;
+            document.getElementById('confirmModalDesc').textContent =
+                'This will remove this habit and its weekly streak history from your dashboard.';
+
+            const confirmBtn = document.getElementById('confirmModalActionBtn');
+            confirmBtn.textContent = 'Delete Habit';
+            confirmBtn.onclick = () => {
+                habits = habits.filter(h => h.id !== habitId);
+                saveHabits();
+                renderAll();
+                closeConfirmModal();
+                showToast('Habit deleted');
+            };
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function openResetModal() {
+            const modal = document.getElementById('confirmModal');
+            document.getElementById('confirmModalTitle').textContent = 'Restore Default Habits?';
+            document.getElementById('confirmModalDesc').textContent =
+                'This will reset your dashboard to the 5 default habits (Upper Body Workout, Creatine & Protein, Python/SQL Study, Skincare, Hydration).';
+
+            const confirmBtn = document.getElementById('confirmModalActionBtn');
+            confirmBtn.textContent = 'Restore Defaults';
+            confirmBtn.onclick = () => {
+                restoreDefaults();
+                closeConfirmModal();
+            };
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeConfirmModal() {
+            const modal = document.getElementById('confirmModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function restoreDefaults() {
+            habits = getDefaultHabits();
+            saveHabits();
+            renderAll();
+            showToast('Default habits restored');
+        }
+
+        /**************************************************************
+         * UTILITIES
+         **************************************************************/
+        let toastTimeout = null;
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').textContent = message;
+            toast.classList.remove('opacity-0', '-translate-y-2');
+            toast.classList.add('opacity-100', 'translate-y-0');
+
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', '-translate-y-2');
+            }, 2200);
+        }
+
+        function escapeHTML(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // Initialize application
+        window.addEventListener('DOMContentLoaded', () => {
+            renderHeaderDate();
+            loadHabits();
+            renderAll();
+            lucide.createIcons();
+        });
+    </script>
+</body>
+</html>
