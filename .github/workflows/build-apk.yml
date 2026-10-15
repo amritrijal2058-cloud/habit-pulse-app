@@ -36,6 +36,10 @@ jobs:
             echo "ERROR: index.html not found in root!"
             exit 1
           fi
+
+          # Inject Android Status Bar & Bottom Gesture Bar Safe Area CSS
+          sed -i 's|</head>|<style>header, body > div > header, .sticky.top-0 { padding-top: max(env(safe-area-inset-top, 0px), 44px) !important; } body { padding-bottom: max(env(safe-area-inset-bottom, 0px), 24px) !important; }</style></head>|i' www/index.html
+
           echo '{"name": "habit-pulse-wrapper", "version": "1.0.0"}' > package.json
           npm install @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7
           npx cap init "Habit Pulse" "com.amrit.habitpulse" --web-dir www
