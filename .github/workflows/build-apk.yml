@@ -23,16 +23,17 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Build Android Project with Capacitor
         run: |
           mkdir -p www
           if [ -f "index.html" ]; then
             cp index.html www/index.html
+          elif ls *.html 1> /dev/null 2>&1; then
+            cp $(ls *.html | head -n 1) www/index.html
+          elif [ -f "index.html.txt" ]; then
+            cp index.html.txt www/index.html
           else
-            echo "ERROR: index.html is missing from the root folder!"
+            echo "ERROR: index.html not found in root!"
             exit 1
           fi
           echo '{"name": "habit-pulse-wrapper", "version": "1.0.0"}' > package.json
